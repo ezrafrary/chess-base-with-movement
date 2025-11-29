@@ -1,4 +1,4 @@
-#include "BitboardElement.h"
+#include "Bitboard.h"
 
 // Constructors
 BitboardElement::BitboardElement() : _data(0) {

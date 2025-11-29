@@ -5,6 +5,7 @@
 Chess::Chess()
 {
     _grid = new Grid(8, 8);
+    initializeBitboards();
 }
 
 Chess::~Chess()
@@ -66,11 +67,10 @@ void Chess::FENtoBoard(const std::string& fen) {
         square->destroyBit();
     });
     
-    int fenIndex = 0;
-    int fenLength = fen.length();
+    size_t fenLength = fen.length();
     
-    int boardPartEnd = fenLength;
-    for (int i = 0; i < fenLength; i++) {
+    size_t boardPartEnd = fenLength;
+    for (size_t i = 0; i < fenLength; i++) {
         if (fen[i] == ' ') {
             boardPartEnd = i;
             break;
@@ -80,7 +80,7 @@ void Chess::FENtoBoard(const std::string& fen) {
     int rank = 7; 
     int file = 0;
     
-    for (int i = 0; i < boardPartEnd; i++) {
+    for (size_t i = 0; i < boardPartEnd; i++) {
         char c = fen[i];
         
         if (c == '/') {
@@ -118,6 +118,8 @@ void Chess::FENtoBoard(const std::string& fen) {
             file++;
         }
     }
+    
+    updateBitboards();
 }
 
 bool Chess::actionForEmptyHolder(BitHolder &holder)
@@ -136,7 +138,33 @@ bool Chess::canBitMoveFrom(Bit &bit, BitHolder &src)
 
 bool Chess::canBitMoveFromTo(Bit &bit, BitHolder &src, BitHolder &dst)
 {
-    return true;
+    ChessSquare* srcSquare = static_cast<ChessSquare*>(&src);
+    ChessSquare* dstSquare = static_cast<ChessSquare*>(&dst);
+    
+    int srcX = srcSquare->getColumn();
+    int srcY = srcSquare->getRow();
+    int dstX = dstSquare->getColumn();
+    int dstY = dstSquare->getRow();
+    
+    if (srcX == dstX && srcY == dstY) return false;
+    
+    // Can't capture your own piece
+    Bit* dstBit = dstSquare->bit();
+    if (dstBit && dstBit->getOwner() == bit.getOwner()) return false;
+    
+    // Get piece type
+    ChessPiece pieceType = getPieceType(&bit);
+    
+    switch (pieceType) {
+        case Pawn:
+            return isValidPawnMove(srcX, srcY, dstX, dstY, bit.getOwner());
+        case Knight:
+            return isValidKnightMove(srcX, srcY, dstX, dstY);
+        case King:
+            return isValidKingMove(srcX, srcY, dstX, dstY);
+        default:
+            return false; 
+    }
 }
 
 void Chess::stopGame()
@@ -182,7 +210,8 @@ std::string Chess::stateString()
             s += pieceNotation( x, y );
         }
     );
-    return s;}
+    return s;
+}
 
 void Chess::setStateString(const std::string &s)
 {
@@ -195,4 +224,159 @@ void Chess::setStateString(const std::string &s)
             square->setBit(nullptr);
         }
     });
+}
+
+bool Chess::isValidPawnMove(int srcX, int srcY, int dstX, int dstY, Player* player) const
+{
+    int direction = (player->playerNumber() == 0) ? 1 : -1; // White moves up, Black moves down
+    int startRank = (player->playerNumber() == 0) ? 1 : 6;
+    
+    int deltaX = dstX - srcX;
+    int deltaY = dstY - srcY;
+    
+    Bit* dstBit = _grid->getSquare(dstX, dstY)->bit();
+    
+    // Move forward one square
+    if (deltaX == 0 && deltaY == direction && !dstBit) {
+        return true;
+    }
+    
+    // Move forward two squares from starting position
+    if (deltaX == 0 && deltaY == 2 * direction && srcY == startRank && !dstBit) {
+        // Check if square in between is empty
+        Bit* middleBit = _grid->getSquare(srcX, srcY + direction)->bit();
+        if (!middleBit) {
+            return true;
+        }
+    }
+    
+    // Capture diagonally
+    if (abs(deltaX) == 1 && deltaY == direction && dstBit && dstBit->getOwner() != player) {
+        return true;
+    }
+    
+    return false;
+}
+
+bool Chess::isValidKnightMove(int srcX, int srcY, int dstX, int dstY) const
+{
+    int srcSquare = srcY * 8 + srcX;
+    int dstSquare = dstY * 8 + dstX;
+    
+    BitboardElement moves = getKnightMoves(srcSquare);
+    uint64_t dstBit = 1ULL << dstSquare;
+    
+    return (moves.getData() & dstBit) != 0;
+}
+
+bool Chess::isValidKingMove(int srcX, int srcY, int dstX, int dstY) const
+{
+    int srcSquare = srcY * 8 + srcX;
+    int dstSquare = dstY * 8 + dstX;
+    
+    BitboardElement moves = getKingMoves(srcSquare);
+    uint64_t dstBit = 1ULL << dstSquare;
+    
+    return (moves.getData() & dstBit) != 0;
+}
+
+// Bitboard helper methods
+
+void Chess::initializeBitboards()
+{
+    // Initialize knight move table
+    for (int square = 0; square < 64; square++) {
+        int rank = square / 8;
+        int file = square % 8;
+        uint64_t moves = 0;
+        
+        // All 8 possible knight moves
+        int knightMoves[8][2] = {
+            {-2, -1}, {-2, 1}, {-1, -2}, {-1, 2},
+            {1, -2}, {1, 2}, {2, -1}, {2, 1}
+        };
+        
+        for (int i = 0; i < 8; i++) {
+            int newFile = file + knightMoves[i][0];
+            int newRank = rank + knightMoves[i][1];
+            
+            if (newFile >= 0 && newFile < 8 && newRank >= 0 && newRank < 8) {
+                int targetSquare = newRank * 8 + newFile;
+                moves |= (1ULL << targetSquare);
+            }
+        }
+        
+        _knightMoves[square] = BitboardElement(moves);
+    }
+    
+    // Initialize king move table
+    for (int square = 0; square < 64; square++) {
+        int rank = square / 8;
+        int file = square % 8;
+        uint64_t moves = 0;
+        
+        // All 8 possible king moves
+        int kingMoves[8][2] = {
+            {-1, -1}, {-1, 0}, {-1, 1}, {0, -1},
+            {0, 1}, {1, -1}, {1, 0}, {1, 1}
+        };
+        
+        for (int i = 0; i < 8; i++) {
+            int newFile = file + kingMoves[i][0];
+            int newRank = rank + kingMoves[i][1];
+            
+            if (newFile >= 0 && newFile < 8 && newRank >= 0 && newRank < 8) {
+                int targetSquare = newRank * 8 + newFile;
+                moves |= (1ULL << targetSquare);
+            }
+        }
+        
+        _kingMoves[square] = BitboardElement(moves);
+    }
+}
+
+void Chess::updateBitboards()
+{
+    uint64_t white = 0;
+    uint64_t black = 0;
+    
+    _grid->forEachSquare([&](ChessSquare* square, int x, int y) {
+        Bit* bit = square->bit();
+        if (bit) {
+            int squareIndex = y * 8 + x;
+            uint64_t squareBit = 1ULL << squareIndex;
+            
+            if (bit->gameTag() < 128) {
+                white |= squareBit;
+            } else {
+                black |= squareBit;
+            }
+        }
+    });
+    
+    _whitePieces.setData(white);
+    _blackPieces.setData(black);
+    _allPieces.setData(white | black);
+}
+
+BitboardElement Chess::getKnightMoves(int square) const
+{
+    return _knightMoves[square];
+}
+
+BitboardElement Chess::getKingMoves(int square) const
+{
+    return _kingMoves[square];
+}
+
+uint64_t Chess::squareToBit(int x, int y) const
+{
+    return 1ULL << (y * 8 + x);
+}
+
+ChessPiece Chess::getPieceType(const Bit* bit) const
+{
+    if (!bit) return NoPiece;
+    int gameTag = bit->gameTag();
+    return static_cast<ChessPiece>(gameTag & 0x7F);
 }
