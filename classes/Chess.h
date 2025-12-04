@@ -2,9 +2,9 @@
 
 #include "Game.h"
 #include "Grid.h"
-#include "Bitboard.h"
+#include "GameState.h"
 #include <vector>
-
+ 
 constexpr int pieceSize = 80;
 
 class Chess : public Game
@@ -14,6 +14,7 @@ public:
     ~Chess();
 
     void setUpBoard() override;
+    void endTurn() override;
 
     bool canBitMoveFrom(Bit &bit, BitHolder &src) override;
     bool canBitMoveFromTo(Bit &bit, BitHolder &src, BitHolder &dst) override;
@@ -32,60 +33,27 @@ public:
     Grid* getGrid() override { return _grid; }
 
 private:
+    // Helper functions
     Bit* PieceForPlayer(const int playerNumber, ChessPiece piece);
-    Player* ownerAt(int x, int y) const;
-    void FENtoBoard(const std::string& fen);
     char pieceNotation(int x, int y) const;
-    
-    // Move validation for each piece type
-    bool isValidPawnMove(int srcX, int srcY, int dstX, int dstY, Player* player) const;
-    bool isValidKnightMove(int srcX, int srcY, int dstX, int dstY) const;
-    bool isValidBishopMove(int srcX, int srcY, int dstX, int dstY) const;
-    bool isValidRookMove(int srcX, int srcY, int dstX, int dstY) const;
-    bool isValidQueenMove(int srcX, int srcY, int dstX, int dstY) const;
-    bool isValidKingMove(int srcX, int srcY, int dstX, int dstY) const;
-    
-    // Path checking
-    bool isPathClear(int srcX, int srcY, int dstX, int dstY) const;
-    
-    // Check detection
-    bool isSquareUnderAttack(int x, int y, Player* byPlayer) const;
-    bool isKingInCheck(Player* player) const;
-    bool wouldMoveLeaveKingInCheck(int srcX, int srcY, int dstX, int dstY, Player* player) const;
-    bool hasLegalMoves(Player* player) const;
-    std::pair<int, int> findKing(Player* player) const;
-    
-    // Special moves
-    bool canCastle(int srcX, int srcY, int dstX, int dstY, Player* player) const;
-    void performCastling(int srcX, int srcY, int dstX, int dstY);
-    void handlePawnPromotion(Bit* pawn, int x, int y);
-    
-    // Bitboard operations
-    void initializeBitboards();
-    void updateBitboards();
-    BitboardElement getKnightMoves(int square) const;
-    BitboardElement getKingMoves(int square) const;
-    uint64_t squareToBit(int x, int y) const;
-    
     ChessPiece getPieceType(const Bit* bit) const;
+    int squareToIndex(int x, int y) const { return y * 8 + x; }
+    void indexToSquare(int index, int& x, int& y) const { x = index % 8; y = index / 8; }
+    
+    // Sync between GameState and visual representation
+    void syncGameStateToVisual();
+    void syncVisualToGameState();
+    void updateVisualFromGameState();
+    
+    // Move validation using GameState
+    bool isValidMove(int fromX, int fromY, int toX, int toY);
+    BitMove findMoveInList(int fromX, int fromY, int toX, int toY, const std::vector<BitMove>& moves) const;
+    
+    // Apply move to both GameState and visual
+    void applyMove(const BitMove& move);
+    void handleSpecialMoves(const BitMove& move);
 
     Grid* _grid;
-    
-    // Game state
-    bool _whiteKingMoved;
-    bool _blackKingMoved;
-    bool _whiteRookAMoved;
-    bool _whiteRookHMoved;
-    bool _blackRookAMoved;
-    bool _blackRookHMoved;
-    int _enPassantColumn;
-    int _enPassantRow;
-    
-    // Bitboards
-    BitboardElement _whitePieces;
-    BitboardElement _blackPieces;
-    BitboardElement _allPieces;
-    
-    BitboardElement _knightMoves[64];
-    BitboardElement _kingMoves[64];
+    GameState _gameState;
+    std::vector<BitMove> _currentLegalMoves;
 };
