@@ -18,6 +18,7 @@ public:
     bool canBitMoveFrom(Bit &bit, BitHolder &src) override;
     bool canBitMoveFromTo(Bit &bit, BitHolder &src, BitHolder &dst) override;
     bool actionForEmptyHolder(BitHolder &holder) override;
+    void bitMovedFromTo(Bit &bit, BitHolder &src, BitHolder &dst) override;
 
     void stopGame() override;
 
@@ -36,10 +37,30 @@ private:
     void FENtoBoard(const std::string& fen);
     char pieceNotation(int x, int y) const;
     
+    // Move validation for each piece type
     bool isValidPawnMove(int srcX, int srcY, int dstX, int dstY, Player* player) const;
     bool isValidKnightMove(int srcX, int srcY, int dstX, int dstY) const;
+    bool isValidBishopMove(int srcX, int srcY, int dstX, int dstY) const;
+    bool isValidRookMove(int srcX, int srcY, int dstX, int dstY) const;
+    bool isValidQueenMove(int srcX, int srcY, int dstX, int dstY) const;
     bool isValidKingMove(int srcX, int srcY, int dstX, int dstY) const;
     
+    // Path checking
+    bool isPathClear(int srcX, int srcY, int dstX, int dstY) const;
+    
+    // Check detection
+    bool isSquareUnderAttack(int x, int y, Player* byPlayer) const;
+    bool isKingInCheck(Player* player) const;
+    bool wouldMoveLeaveKingInCheck(int srcX, int srcY, int dstX, int dstY, Player* player) const;
+    bool hasLegalMoves(Player* player) const;
+    std::pair<int, int> findKing(Player* player) const;
+    
+    // Special moves
+    bool canCastle(int srcX, int srcY, int dstX, int dstY, Player* player) const;
+    void performCastling(int srcX, int srcY, int dstX, int dstY);
+    void handlePawnPromotion(Bit* pawn, int x, int y);
+    
+    // Bitboard operations
     void initializeBitboards();
     void updateBitboards();
     BitboardElement getKnightMoves(int square) const;
@@ -50,6 +71,17 @@ private:
 
     Grid* _grid;
     
+    // Game state
+    bool _whiteKingMoved;
+    bool _blackKingMoved;
+    bool _whiteRookAMoved;
+    bool _whiteRookHMoved;
+    bool _blackRookAMoved;
+    bool _blackRookHMoved;
+    int _enPassantColumn;
+    int _enPassantRow;
+    
+    // Bitboards
     BitboardElement _whitePieces;
     BitboardElement _blackPieces;
     BitboardElement _allPieces;
