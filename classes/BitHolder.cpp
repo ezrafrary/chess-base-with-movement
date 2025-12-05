@@ -39,6 +39,13 @@ void BitHolder::setBit(Bit *abit)
 	}
 }
 
+Bit *BitHolder::releaseBit()
+{
+    Bit *b = _bit;
+    _bit = nullptr;
+    return b;
+}
+
 void BitHolder::destroyBit()
 {
 	if (_bit)

@@ -13,6 +13,8 @@ namespace ClassGame {
         Game *game = nullptr;
         bool gameOver = false;
         int gameWinner = -1;
+        bool whiteAI = false;
+        bool blackAI = false;
 
         //
         // game starting point
@@ -21,6 +23,8 @@ namespace ClassGame {
         void GameStartUp() 
         {
             game = nullptr;
+            whiteAI = false;
+            blackAI = false;
         }
 
         //
@@ -32,21 +36,22 @@ namespace ClassGame {
                 ImGui::DockSpaceOverViewport();
 
                 //ImGui::ShowDemoWindow();
+                
+                // Check if current game is Chess for automated gameplay
+                Chess* chessGame = dynamic_cast<Chess*>(game);
 
                 ImGui::Begin("Settings");
 
                 if (gameOver) {
                     ImGui::Text("Game Over!");
-                    if (gameWinner == -1) {
-                        ImGui::Text("Draw - Stalemate!");
-                    } else {
-                        ImGui::Text("Checkmate! Winner: Player %d", gameWinner + 1);
-                    }
+                    ImGui::Text("Winner: %d", gameWinner);
                     if (ImGui::Button("Reset Game")) {
                         game->stopGame();
                         game->setUpBoard();
                         gameOver = false;
                         gameWinner = -1;
+                        whiteAI = false;
+                        blackAI = false;
                     }
                 }
                 if (!game) {
@@ -69,6 +74,8 @@ namespace ClassGame {
                     if (ImGui::Button("Start Chess")) {
                         game = new Chess();
                         game->setUpBoard();
+                        whiteAI = false;
+                        blackAI = false;
                     }
                 } else {
                     ImGui::Text("Current Player Number: %d", game->getCurrentPlayer()->playerNumber());
@@ -80,6 +87,12 @@ namespace ClassGame {
                         ImGui::Text("%s", stateString.substr(y*stride,stride).c_str());
                     }
                     ImGui::Text("Current Board State: %s", game->stateString().c_str());
+                    
+                    // Add automated gameplay button for Chess
+                    if (chessGame) {
+                        ImGui::Checkbox("White AI", &whiteAI);
+                        ImGui::Checkbox("Black AI", &blackAI);
+                    }
                 }
                 ImGui::End();
 
@@ -89,6 +102,15 @@ namespace ClassGame {
                     {
                         game->updateAI();
                     }
+                    
+                    // Handle automated gameplay for Chess
+                    if (chessGame && !gameOver) {
+                        int currentPlayer = game->getCurrentPlayer()->playerNumber();
+                        if ((currentPlayer == 0 && whiteAI) || (currentPlayer == 1 && blackAI)) {
+                            chessGame->makeRandomMoveForCurrentPlayer();
+                        }
+                    }
+                    
                     game->drawFrame();
                 }
                 ImGui::End();

@@ -41,8 +41,8 @@ enum AllBitBoards
 enum MoveFlags {
     EnPassant = 0x01, // 0000 0001
     IsCapture = 0x02, // 0000 0010
-    KingSideCastle = 0x04, // 0000 0100
-    QueenSideCastle = 0x08, // 0000 1000
+    KingCastle = 0x04, // 0000 0100
+    QueenCastle = 0x08, // 0000 1000
     IsPromotion = 0x10 // 0001 0000
 };
 
@@ -98,10 +98,10 @@ public:
         unsigned char fromPiece = state[move.from];
         state[move.from] = '0';
         state[move.to] = fromPiece;
-        if (move.flags & KingSideCastle) {
+        if (move.flags & KingCastle) {
             state[move.to - 1] = state[move.to + 1];
             state[move.to + 1] = '0';
-        } else if (move.flags & QueenSideCastle) {
+        } else if (move.flags & QueenCastle) {
             state[move.to + 1] = state[move.to - 2];
             state[move.to - 2] = '0';
         } else if (move.flags & EnPassant) {
